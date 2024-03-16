@@ -93,40 +93,43 @@ class switch:
         """
         self.start = True
 
-        # We want to keep serving as long as the simulator has not reached the end of the ticks or there are pending packets
+        arrivals_times = []
+        for in_port in range(self.in_ports_num):
+            port_arrivals = []
+            time = 0
+            while time < self.ticks:
+                next_arrival = np.random.exponential(1 / self.lamdas[in_port])
+                time += next_arrival
+                port_arrivals.append(time)
+            arrivals_times.append(port_arrivals)
+
         while self.current_time < self.ticks or self.pending_packets():
+            next = -1
             for out_port in self.out_ports:
-                # Re-initialize the out port for the new tick (setting the new rates etc), pending packets won't be flushed
-                out_port.tick_start(self.current_time)
-                # Edge case: if the last tick ended and the queues are full, we need to serve the packets before the new tick,
-                # ow, new packets won't be added to the queue
-                out_port.serve_packets()
-            
-            # Only if we are not at the end of the ticks, we can generate new packets
-            if self.current_time < self.ticks:
-                for in_port in range(self.in_ports_num):
-                    num_packets = np.random.poisson(self.lamdas[in_port])
+                next = max(next, out_port.serve_packets(self.current_time))
 
-                    log(f"Tick: {self.current_time}, In port: {in_port}, New packets: {num_packets}",
-                        debug_lvl.DEBUG_LVL_FML.value)
+            for in_port in range(self.in_ports_num):
+                if len(arrivals_times[in_port]) > 0:
+                    if next == -1:
+                        next = arrivals_times[in_port][0]
+                    else:
+                        next = min(next, arrivals_times[in_port][0])
 
-                    for _ in range(num_packets):
-                        out_port = np.random.choice(self.out_ports_num, 1, p=self.prob_mat[in_port])[0]
-                        p = packet(self.current_time, in_port, out_port)
-                        self.packets.append(p)
-                        ret = self.out_ports[out_port].add_packet(p)
-                        if ret:
-                            self.succ_packets += 1
-                        else:
-                            self.dropped_packets += 1
-            
-            # Before the new tick, we serve the packets in the out ports.
-            # Proboably not nessesary, as we already served the packets in the out ports in the first loop
-            for out_port in range(self.out_ports_num):
-                self.out_ports[out_port].serve_packets()
-            
-            self.current_time += 1
-            
+                    out_port = np.random.choice(self.out_ports_num, 1, p=self.prob_mat[in_port])[0]
+                    next_trans = np.random.exponential(1 / self.service_rates[out_port])
+                    p = packet(arrivals_times[in_port][0], next_trans, in_port, out_port)
+                    self.packets.append(p)
+                    ret = self.out_ports[out_port].add_packet(p)
+                    if ret:
+                        self.succ_packets += 1
+                    else:
+                        self.dropped_packets += 1
+                
+                    self.out_ports[out_port].serve_packets(self.current_time)
+                    arrivals_times[in_port].pop(0)
+
+            self.current_time = next
+
     def print_stats(self) -> None:
         """
         Prints the statistics of the simulation.
@@ -167,8 +170,8 @@ class switch:
             if packet.dropped():
                 continue
 
-            avg_waiting_time += packet.service_time - packet.arrival_time
-            avg_service_time += packet.service_rate
+            avg_waiting_time += packet.served_time - packet.arrival_time
+            avg_service_time += packet.service_time
             cntr += 1
         
         avg_waiting_time /= cntr

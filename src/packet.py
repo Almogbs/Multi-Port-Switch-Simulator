@@ -10,6 +10,7 @@ class packet:
         service_rate (int): The service rate of the packet.
         in_port_idx (int): The index of the input port for the packet.
         out_port_idx (int): The index of the output port for the packet.
+        index (int): The index of the packet.
 
     Methods:
         __init__(self, arrival_time: int, in_port_idx: int, out_port_idx: int) -> None:
@@ -19,13 +20,16 @@ class packet:
         dropped(self) -> bool:
             Checks if the packet has been dropped.
     """
+    global_index = 0
 
-    def __init__(self, arrival_time: int, in_port_idx: int, out_port_idx: int) -> None:
+    def __init__(self, arrival_time: float, service_time: float, in_port_idx: int, out_port_idx: int) -> None:
         self.arrival_time = arrival_time
-        self.service_time = -1
-        self.service_rate = -1
+        self.served_time = -1
+        self.service_time = service_time
         self.in_port_idx = in_port_idx
         self.out_port_idx = out_port_idx
+        self.index = packet.global_index
+        packet.global_index += 1
 
     def __str__(self) -> str:
         return f"Arrival time: {self.arrival_time} Service time: {self.service_time} \
@@ -39,4 +43,5 @@ class packet:
         Returns:
             bool: True if the packet has been dropped, False otherwise.
         """
-        return self.service_time == -1
+        return self.served_time == -1
+    

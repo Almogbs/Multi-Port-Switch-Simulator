@@ -35,39 +35,29 @@ class out_port:
         self.queue = []
         self.succ_packets = 0
         self.dropped_packets = 0
-        self.current_time = 0
-        self.current_rate = 0
-        self.current_served = 0
+        self.next_service_time = 0
     
     def __str__(self) -> str:
         return f"Port id: {self.port_id} Queue size: {self.queue_size} Service rate: {self.service_rate} \
                  Queue: {self.queue} Succ packets: {self.succ_packets} Dropped packets: {self.dropped_packets}"
         
-    def tick_start(self, current_time: int) -> None:
-        """
-        Starts the tick for the out port.
-
-        Args:
-            current_time (int): The current time in the simulation.
-        """
-        self.current_time = current_time
-        self.current_served = 0
-        self.current_rate = np.random.poisson(self.service_rate)
-
-    def serve_packets(self) -> None:
+    def serve_packets(self, current_time: float) -> float:
         """
         Serves the packets in the queue.
-        """        
-        log(f"Tick: {self.current_time}, Out port: {self.port_id}, Pending Packets: {len(self.queue)}, Served: {self.current_served}, Rate: {self.current_rate}ppt",
-             debug_lvl.DEBUG_LVL_FML.value)
+        """
+        while len(self.queue) > 0 and self.queue[0].served_time <= current_time:
+            p = self.queue.pop(0)
 
-        while self.current_served < self.current_rate and len(self.queue) > 0:
-                packet = self.queue.pop(0)
-                self.current_time += (1 / self.current_rate)
-                packet.service_time = self.current_time
-                packet.service_rate = (1 / self.current_rate)
-                self.current_served += 1
-                self.succ_packets += 1
+            log(f"Time: {current_time}, op: SERVE({p.index}), Out Port: {self.port_id}, Queue-size: {len(self.queue)}, Arrival-time: {p.arrival_time}, Served-time: {p.served_time}, Service-time: {p.service_time}, Next-service-time: {self.next_service_time}",
+                debug_lvl.DEBUG_LVL_FML.value)
+
+            self.succ_packets += 1
+
+        if len(self.queue) > 0:
+            return self.queue[0].served_time
+        
+        return current_time
+
 
     def add_packet(self, packet: packet) -> bool:
         """
@@ -81,9 +71,23 @@ class out_port:
         """
         if len(self.queue) < self.queue_size:
             self.queue.append(packet)
-            self.serve_packets()
+
+            if len(self.queue) == 1:
+                self.next_service_time = packet.arrival_time + packet.service_time
+            else:
+                self.next_service_time = max(self.next_service_time + packet.service_time, packet.arrival_time + packet.service_time)
+            
+            packet.served_time = self.next_service_time
+            
+            log(f"Time: {packet.arrival_time}, op=ADD({packet.index}), Out Port: {self.port_id}, Queue-size: {len(self.queue)}, Arrival-time: {packet.arrival_time}, Served-time: {packet.served_time}, Service-time: {packet.service_time}, Next-service-time: {self.next_service_time}",
+                debug_lvl.DEBUG_LVL_FML.value)
+
             return True
         else:
             self.dropped_packets += 1
+
+            log(f"Time: {packet.arrival_time}, op=ADD({packet.index}) DROPPED, Out Port: {self.port_id}, Queue-size: {len(self.queue)}, Arrival-time: {packet.arrival_time}, Served-time: {packet.served_time}, Service-time: {packet.service_time}, Next-service-time: {self.next_service_time}",
+                debug_lvl.DEBUG_LVL_FML.value)
+    
             return False
         
