@@ -92,7 +92,17 @@ class switch:
         of successful packets and dropped packets.
         """
         self.start = True
+
+        # We want to keep serving as long as the simulator has not reached the end of the ticks or there are pending packets
         while self.current_time < self.ticks or self.pending_packets():
+            for out_port in self.out_ports:
+                # Re-initialize the out port for the new tick (setting the new rates etc), pending packets won't be flushed
+                out_port.tick_start(self.current_time)
+                # Edge case: if the last tick ended and the queues are full, we need to serve the packets before the new tick,
+                # ow, new packets won't be added to the queue
+                out_port.serve_packets()
+            
+            # Only if we are not at the end of the ticks, we can generate new packets
             if self.current_time < self.ticks:
                 for in_port in range(self.in_ports_num):
                     num_packets = np.random.poisson(self.lamdas[in_port])
@@ -109,12 +119,13 @@ class switch:
                             self.succ_packets += 1
                         else:
                             self.dropped_packets += 1
-
+            
+            # Before the new tick, we serve the packets in the out ports.
+            # Proboably not nessesary, as we already served the packets in the out ports in the first loop
             for out_port in range(self.out_ports_num):
-                self.out_ports[out_port].service_packets(self.current_time)
+                self.out_ports[out_port].serve_packets()
             
             self.current_time += 1
-        
             
     def print_stats(self) -> None:
         """
@@ -151,15 +162,17 @@ class switch:
 
         avg_waiting_time = 0
         avg_service_time = 0
+        cntr = 0
         for packet in self.packets:
             if packet.dropped():
                 continue
 
             avg_waiting_time += packet.service_time - packet.arrival_time
             avg_service_time += packet.service_rate
+            cntr += 1
         
-        avg_waiting_time /= self.succ_packets
-        avg_service_time /= self.succ_packets
+        avg_waiting_time /= cntr
+        avg_service_time /= cntr
 
         stats.append(avg_waiting_time)
         stats.append(avg_service_time)

@@ -35,11 +35,40 @@ class out_port:
         self.queue = []
         self.succ_packets = 0
         self.dropped_packets = 0
+        self.current_time = 0
+        self.current_rate = 0
+        self.current_served = 0
     
     def __str__(self) -> str:
         return f"Port id: {self.port_id} Queue size: {self.queue_size} Service rate: {self.service_rate} \
                  Queue: {self.queue} Succ packets: {self.succ_packets} Dropped packets: {self.dropped_packets}"
-    
+        
+    def tick_start(self, current_time: int) -> None:
+        """
+        Starts the tick for the out port.
+
+        Args:
+            current_time (int): The current time in the simulation.
+        """
+        self.current_time = current_time
+        self.current_served = 0
+        self.current_rate = np.random.poisson(self.service_rate)
+
+    def serve_packets(self) -> None:
+        """
+        Serves the packets in the queue.
+        """        
+        log(f"Tick: {self.current_time}, Out port: {self.port_id}, Pending Packets: {len(self.queue)}, Served: {self.current_served}, Rate: {self.current_rate}ppt",
+             debug_lvl.DEBUG_LVL_FML.value)
+
+        while self.current_served < self.current_rate and len(self.queue) > 0:
+                packet = self.queue.pop(0)
+                self.current_time += (1 / self.current_rate)
+                packet.service_time = self.current_time
+                packet.service_rate = (1 / self.current_rate)
+                self.current_served += 1
+                self.succ_packets += 1
+
     def add_packet(self, packet: packet) -> bool:
         """
         Adds a packet to the queue.
@@ -52,27 +81,9 @@ class out_port:
         """
         if len(self.queue) < self.queue_size:
             self.queue.append(packet)
-            self.succ_packets += 1
+            self.serve_packets()
             return True
         else:
             self.dropped_packets += 1
             return False
-    
-    def service_packets(self, current_time: int) -> None:
-        """
-        Services the packets in the queue.
-
-        Args:
-            current_time (int): The current time in the simulation.
-        """
-        if len(self.queue) > 0:
-            packets_to_service = np.random.poisson(self.service_rate)
-            service_rate = packets_to_service
-            log(f"Tick: {current_time}, Out port: {self.port_id}, Pending Packets: {len(self.queue)}, To Serve: {packets_to_service}",
-                debug_lvl.DEBUG_LVL_FML.value)
-
-            while packets_to_service > 0 and len(self.queue) > 0:
-                packet = self.queue.pop(0)
-                packet.service_time = current_time
-                packet.service_rate = (1 / service_rate)
-                packets_to_service -= 1
+        

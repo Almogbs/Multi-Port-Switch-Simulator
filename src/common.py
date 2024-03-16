@@ -17,7 +17,7 @@ class debug_lvl(Enum):
     DEBUG_LVL_FML = 2
 
 # Set the debug level
-DEBUG = debug_lvl.DEBUG_LVL_STD.value
+DEBUG = debug_lvl.DEBUG_LVL_FML.value
 
 def log(msg: str, level: int = debug_lvl.DEBUG_LVL_STD.value) -> None:
     """
