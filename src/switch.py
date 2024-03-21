@@ -93,42 +93,37 @@ class switch:
         """
         self.start = True
 
-        arrivals_times = []
         for in_port in range(self.in_ports_num):
-            port_arrivals = []
-            time = 0
+            time = 0.0
             while time < self.ticks:
-                next_arrival = np.random.exponential(1 / self.lamdas[in_port])
+                next_arrival = np.random.exponential(1.0 / self.lamdas[in_port])
                 time += next_arrival
-                port_arrivals.append(time)
-            arrivals_times.append(port_arrivals)
+                out_port = np.random.choice(self.out_ports_num, 1, p=self.prob_mat[in_port])[0]
+                service_time = np.random.exponential(1.0 / self.service_rates[out_port])
+                p = packet(time, service_time, in_port, out_port)
+                self.packets.append(p)
+        
+        self.packets.sort(key=lambda x: x.arrival_time)
 
-        while self.current_time < self.ticks or self.pending_packets():
-            next = -1
+        for p in self.packets:
+            self.current_time = p.arrival_time
+            
+            out_port = p.out_port_idx
+            self.out_ports[out_port].serve_packets(self.current_time)
+
+            ret = self.out_ports[out_port].add_packet(p)
+            if ret:
+                self.succ_packets += 1
+            else:
+                self.dropped_packets += 1
+
+            self.out_ports[out_port].serve_packets(self.current_time)
+
+        while self.pending_packets():
+            self.current_time += 1
             for out_port in self.out_ports:
-                next = max(next, out_port.serve_packets(self.current_time))
+                out_port.serve_packets(self.current_time)
 
-            for in_port in range(self.in_ports_num):
-                if len(arrivals_times[in_port]) > 0:
-                    if next == -1:
-                        next = arrivals_times[in_port][0]
-                    else:
-                        next = min(next, arrivals_times[in_port][0])
-
-                    out_port = np.random.choice(self.out_ports_num, 1, p=self.prob_mat[in_port])[0]
-                    next_trans = np.random.exponential(1 / self.service_rates[out_port])
-                    p = packet(arrivals_times[in_port][0], next_trans, in_port, out_port)
-                    self.packets.append(p)
-                    ret = self.out_ports[out_port].add_packet(p)
-                    if ret:
-                        self.succ_packets += 1
-                    else:
-                        self.dropped_packets += 1
-                
-                    self.out_ports[out_port].serve_packets(self.current_time)
-                    arrivals_times[in_port].pop(0)
-
-            self.current_time = next
 
     def print_stats(self) -> None:
         """
@@ -161,7 +156,8 @@ class switch:
             stats.append(out_port.dropped_packets)
 
         # maybe -1 ?
-        stats.append(self.current_time)
+        # get the max served_time of the packets
+        stats.append(max([p.served_time for p in self.packets]))
 
         avg_waiting_time = 0
         avg_service_time = 0
@@ -170,7 +166,7 @@ class switch:
             if packet.dropped():
                 continue
 
-            avg_waiting_time += packet.served_time - packet.arrival_time
+            avg_waiting_time += (packet.served_time - packet.arrival_time)
             avg_service_time += packet.service_time
             cntr += 1
         

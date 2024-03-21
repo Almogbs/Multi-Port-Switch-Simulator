@@ -30,7 +30,7 @@ class out_port:
     """
     def __init__(self, port_id: int, queue_size: int, service_rate: int) -> None:
         self.port_id = port_id
-        self.queue_size = queue_size
+        self.queue_size = queue_size + 1
         self.service_rate = service_rate
         self.queue = []
         self.succ_packets = 0
@@ -90,4 +90,3 @@ class out_port:
                 debug_lvl.DEBUG_LVL_FML.value)
     
             return False
-        
