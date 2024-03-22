@@ -82,9 +82,8 @@ class Test(unittest.TestCase):
                 for _ in range(TRIES_PER_T):
                     input = f"{t}{exp}"
                     output = simulate(input)
-                    tw = float(output.split()[-1])
                     ts = float(output.split()[-2])
-                    res.append(ts+tw)
+                    res.append(ts)
                 exp_y.append(mean(res))
 
             plt.plot(T, exp_y)
