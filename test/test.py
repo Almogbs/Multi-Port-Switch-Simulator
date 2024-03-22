@@ -1,5 +1,8 @@
+from statistics import mean
+
 import unittest
 import os
+import matplotlib.pyplot as plt
 
 test_cases = [
     # inputs, outputs
@@ -12,6 +15,10 @@ test_cases = [
 ]
 
 OUTPUT_PERCENT_ERR = 7
+T = [10, 100, 500, 1000, 1500, 2000, 2500]
+TRIES_PER_T = 10
+EXPS = [" 1 1 1 9 1000 12", " 1 1 1 9 5 12"]
+
 
 def get_err_msg(input: str, output: str, expected: str, errs: list) -> str:
     """
@@ -67,5 +74,24 @@ class Test(unittest.TestCase):
                 errs = check_output(output, excepted, OUTPUT_PERCENT_ERR)                   
                 self.assertEqual(errs, [],  get_err_msg(input, output, excepted, errs))
 
-            
+    def test_stress(self):
+        for exp in EXPS:
+            exp_y = []
+            for t in T:
+                res = []
+                for _ in range(TRIES_PER_T):
+                    input = f"{t}{exp}"
+                    output = simulate(input)
+                    tw = float(output.split()[-1])
+                    ts = float(output.split()[-2])
+                    res.append(ts+tw)
+                exp_y.append(mean(res))
+
+            plt.plot(T, exp_y)
+            plt.xlabel("T")
+            plt.ylabel("Average waiting+service time")
+            plt.title("Average waiting+service time vs T")
+            plt.show()
+
+
 unittest.main(argv=[''], verbosity=2, exit=False)
